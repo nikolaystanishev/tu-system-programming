@@ -41,10 +41,10 @@ typedef struct Message
 #define FIFO_NAME           "metadata_fifo"
 #define RESPONSE_LEN         30
 
-char *getTitle(const int);
-char *getArtist(const int);
-char *getAlbum(const int);
-char *getYear(const int);
+void getTitle(const int, char*);
+void getArtist(const int, char*);
+void getAlbum(const int, char*);
+void getYear(const int, char*);
 
 static char buffer[eMaxSize] = {0};
 static char mp3_data[METADATA_SIZE] = {0};
@@ -54,6 +54,7 @@ static char *response = "Information printed!\n";
 int main(int argc, char **argv)
 {	
 	pid_t childId = 0;
+	int named_pipe = 0;
 
 	/* Create the FIFO (named pipe) - it will be executed
 	for child and parent - the first one, who executes this
@@ -66,9 +67,8 @@ int main(int argc, char **argv)
 
 	if (0 == childId)
 	{
-		int      named_pipe = open(FIFO_NAME, O_RDWR);
 		sPackage message    = {0};
-
+		named_pipe = open(FIFO_NAME, O_RDONLY);
 		for(;;)
 		{
 			(void) read(named_pipe, &message, sizeof(message));
@@ -77,12 +77,10 @@ int main(int argc, char **argv)
 			if (1 == message.flag)
 			{
 				(void) printf("\n %s \n", mp3_data);
-				(void) write(named_pipe, response, sizeof(response));
+				close(named_pipe);
 				break;
 			}
 		}
-
-		close(named_pipe);
 
 	}
 	else if (0 < childId)
@@ -93,7 +91,7 @@ int main(int argc, char **argv)
 
 			if (0 <= fd)
 			{
-				int      named_pipe = open(FIFO_NAME, O_RDWR);
+				named_pipe = open(FIFO_NAME, O_WRONLY);
 				sPackage message    = {0};
 				int      iterator   = 0;
 
@@ -102,19 +100,19 @@ int main(int argc, char **argv)
 					// If input parameters for the metadata are provided:
 					if (strcmp(argv[iterator], TITLE_STRING) == 0)
 					{
-						(void) strncpy(message.msg_buf, getTitle(fd), TITLE_SIZE);	
+						getTitle(fd, message.msg_buf);	
 					}
 					else if (strcmp(argv[iterator], ARTIST_STRING) == 0)
 					{
-						(void) strncpy(message.msg_buf, getArtist(fd), ARTIST_SIZE);
+						getArtist(fd, message.msg_buf);
 					}
 					else if (strcmp(argv[iterator], ALBUM_STRING) == 0)
 					{
-						(void) strncpy(message.msg_buf, getAlbum(fd), ALBUM_SIZE);
+						getAlbum(fd, message.msg_buf);
 					}
 					else if (strcmp(argv[iterator], YEAR_STRING) == 0)
 					{
-						(void) strncpy(message.msg_buf, getYear(fd), YEAR_SIZE);
+						getYear(fd, message.msg_buf);
 					}
 					else
 					{
@@ -133,10 +131,6 @@ int main(int argc, char **argv)
 
 				/* Send the content. */
 				(void) write(named_pipe, &message, sizeof(message));
-
-				/* Receive the final response. */
-				(void) read(named_pipe, reponse_buf, sizeof(RESPONSE_LEN));
-				printf("\n %s \n", reponse_buf);
 
 				(void) close(fd);
 				(void) close(named_pipe);
@@ -157,7 +151,7 @@ int main(int argc, char **argv)
 	return 0;
 }
 
-char *getTitle(const int fd)
+void getTitle(const int fd, char* buffer)
 {
 	// Get the offset byte.
 	(void) lseek(fd, TITLE_OFFSET, SEEK_END);
@@ -167,11 +161,9 @@ char *getTitle(const int fd)
 
 	// Remove the white-space characters.
 	(void) strtok(buffer, " ");
-
-	return buffer;
 }
 
-char *getArtist(const int fd)
+void getArtist(const int fd, char* buffer)
 {
 	// Get the offset byte.
 	(void) lseek(fd, ARTIST_OFFSET, SEEK_END);
@@ -181,11 +173,9 @@ char *getArtist(const int fd)
 
 	// Remove the white-space characters.
 	(void) strtok(buffer, " ");
-
-	return buffer;
 }
 
-char *getAlbum(const int fd)
+void getAlbum(const int fd, char* buffer)
 {
 	// Get the offset byte.
 	(void) lseek(fd, ALBUM_OFFSET, SEEK_END);
@@ -195,11 +185,9 @@ char *getAlbum(const int fd)
 
 	// Remove the white-space characters.
 	(void) strtok(buffer, " ");
-
-	return buffer;
 }
 
-char *getYear(const int fd)
+void getYear(const int fd, char* buffer)
 {
 	// Get the offset byte.
 	(void) lseek(fd, YEAR_OFFSET, SEEK_END);
@@ -209,6 +197,4 @@ char *getYear(const int fd)
 
 	// Remove the white-space characters.
 	(void) strtok(buffer, " ");
-
-	return buffer;
 }
