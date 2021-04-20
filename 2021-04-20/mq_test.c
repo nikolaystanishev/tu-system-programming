@@ -28,7 +28,7 @@ void *readQueue(void *args)
     attr.mq_curmsgs = 0;
 
     /* create the message queue */
-    mq = mq_open(QUEUE_NAME, O_CREAT | O_RDONLY | O_EXCL, 0700, &attr); // Be careful with the flags - mq_open could fail, because of the creation!
+    mq = mq_open(QUEUE_NAME, O_CREAT | O_RDONLY, 0700, &attr); // Be careful with the flags - mq_open could fail, because of the creation!
 
     /* check if the queue open is succesful */
     if (mq > -1)
@@ -47,6 +47,8 @@ void *readQueue(void *args)
         printf("Failed to load queue!");
     }
 
+    mq_close(mq);
+
     pthread_exit(NULL);
 }
 
@@ -58,7 +60,7 @@ void *writeToQueue(void *args)
     char  buffer[MAX_SIZE] = "Testing queue"; // This could be taken from stdin
 
     /* open the queue */
-    mq = mq_open(QUEUE_NAME, O_WRONLY | O_EXCL, 0700, NULL);
+    mq = mq_open(QUEUE_NAME, O_WRONLY, 0700, NULL);
 
     /* check if the queue open is succesful */
     if (mq > -1)
@@ -70,6 +72,8 @@ void *writeToQueue(void *args)
     {
         printf("Failed to load queue!");
     }
+
+    mq_close(mq);
 
     pthread_exit(NULL);
 }
@@ -115,6 +119,8 @@ int main (int argc, char *argv[])
 
     printf("Main: program completed. Exiting.\n");
 
+    mq_unlink(QUEUE_NAME);
+    
     pthread_exit(NULL);
 
     return 0;
