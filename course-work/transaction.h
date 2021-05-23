@@ -30,7 +30,7 @@ typedef enum ResponseCode {
 
 typedef struct Response {
     ResponseCode code;
-    char message[50];
+    char message[1000];
 } Response;
 
 #endif

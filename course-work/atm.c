@@ -102,7 +102,6 @@ void client_ui(Language lang) {
     printf("%s: ", get_ui_string(lang, WITHDRAW));
     scanf("%d", &trans.withdraw_amount);
 
-    // TODO: create cash receipt
     bool cash_receipt = choose_yes_no(lang, CASH_RECEIPT);
     trans.cash_receipt = cash_receipt;
 
@@ -253,6 +252,12 @@ void sendClientTCPRequest(Transaction transaction) {
 
     perror("end");
     fprintf(stdout, "Code - %u | Message: %s", response.code, response.message);
+    if (response.code == SUCCESSFULL_WITHDRAW && transaction.cash_receipt) {
+        FILE *fp;
+        fp = fopen("cash_receipt", "w");
+        fwrite(response.message, sizeof(response.message), 1, fp);
+        fclose(fp);
+    }
 }
 
 void sendAdminTCPRequest(Client client) {

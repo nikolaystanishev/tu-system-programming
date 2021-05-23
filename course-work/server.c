@@ -200,7 +200,10 @@ void handleClientTCPConnection() {
 
         client.lock = false;
 
-            Response response = {SUCCESSFULL_WITHDRAW, ""};
+        char cash_receipt[1000];
+        snprintf(cash_receipt, 1000, "Money in account - %d | Withdrawen money - %d", client.amount, transaction.withdraw_amount);
+
+        Response response = {SUCCESSFULL_WITHDRAW, cash_receipt};
         if (send(nsocket_client, &response, sizeof(Response), 0) < 0) {
             perror("Socket send");
             exit(4);
