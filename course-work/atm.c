@@ -63,7 +63,6 @@ int main() {
     osocket_admin = initializeTCPConnection(ADMIN_PORT);
 
     ui();
-    // TODO: add basic atm operations as show how money I have
 
     closeTCPConnection();
 
@@ -105,7 +104,7 @@ void client_ui(Language lang) {
     bool cash_receipt = choose_yes_no(lang, CASH_RECEIPT);
     trans.cash_receipt = cash_receipt;
 
-    // TODO: add multi client support
+    // TODO: test what happens with multiple clients if it is missing add multi client support
     sendClientTCPRequest(trans);
 }
 
@@ -178,7 +177,7 @@ char* get_ui_string(Language lang, UIString key) {
             case CARD_NUMBER:
                 return "Номер на картата";
             case WITHDRAW:
-                return "Размер на теглене";
+                return "Размер на теглене /при избиране на 0 може да видите наличността по сметката си/";
             case CASH_RECEIPT:
                 return "Изкаш ли касов бон";
             case PIN:
@@ -197,7 +196,7 @@ char* get_ui_string(Language lang, UIString key) {
             case CARD_NUMBER:
                 return "Card number";
             case WITHDRAW:
-                return "Withdraw Amount";
+                return "Withdraw Amount /by choosing 0 you can observe your account amount/";
             case CASH_RECEIPT:
                 return "Do you want cash receipt";
             case PIN:
