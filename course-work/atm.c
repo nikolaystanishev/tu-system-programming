@@ -32,6 +32,7 @@ typedef enum Language {
 typedef enum UIString {
     ADMIN_OR_CLIENT,
     AMOUNT,
+    CARD_NAME,
     CARD_NUMBER,
     WITHDRAW,
     CASH_RECEIPT,
@@ -95,10 +96,10 @@ void client_ui(Language lang) {
 
     strcpy(trans.card_number, read_card_number(lang));
 
-    printf("%s: ", get_ui_string(lang, PIN));
+    fprintf(stdout, "%s: ", get_ui_string(lang, PIN));
     scanf("%s", trans.pin);
 
-    printf("%s: ", get_ui_string(lang, WITHDRAW));
+    fprintf(stdout, "%s: ", get_ui_string(lang, WITHDRAW));
     scanf("%d", &trans.withdraw_amount);
 
     bool cash_receipt = choose_yes_no(lang, CASH_RECEIPT);
@@ -111,17 +112,21 @@ void client_ui(Language lang) {
 void admin_ui(Language lang) {
     Client client;
 
-    printf("%s: ", get_ui_string(lang, CARD_NUMBER));
+    fprintf(stdout, "%s: ", get_ui_string(lang, CARD_NAME));
+    char card_name[100];
+    scanf("%s", card_name);
+
+    fprintf(stdout, "%s: ", get_ui_string(lang, CARD_NUMBER));
     scanf("%s", client.card_number);
     FILE *fp;
-    fp = fopen("card", "w");
+    fp = fopen(card_name, "w");
     fwrite(client.card_number, sizeof(client.card_number), 1, fp);
     fclose(fp);
 
-    printf("%s: ", get_ui_string(lang, PIN));
+    fprintf(stdout, "%s: ", get_ui_string(lang, PIN));
     scanf("%s", client.pin);
 
-    printf("%s: ", get_ui_string(lang, WITHDRAW));
+    fprintf(stdout, "%s: ", get_ui_string(lang, AMOUNT));
     scanf("%d", &client.amount);
 
     client.lock = false;
@@ -130,7 +135,7 @@ void admin_ui(Language lang) {
 }
 
 Language choose_language() {
-    printf("Choose Language: ");
+    fprintf(stdout, "Choose Language: ");
     char lang[2];
     scanf("%s", lang);
 
@@ -143,7 +148,7 @@ Language choose_language() {
 }
 
 bool choose_yes_no(Language lang, UIString key) {
-    printf("%s /y, n/: ", get_ui_string(lang, key));
+    fprintf(stdout, "%s /y, n/: ", get_ui_string(lang, key));
     char cr;
     scanf(" %c", &cr);
 
@@ -154,13 +159,15 @@ bool choose_yes_no(Language lang, UIString key) {
 }
 
 char* read_card_number(Language lang) {
-    printf("%s: ", get_ui_string(lang, CARD));
+    fprintf(stdout, "%s: ", get_ui_string(lang, CARD));
 
-    char card[100];
+    char card_name[100];
     char *card_number = malloc(17 * sizeof(char));
 
+    scanf("%s", card_name);
+
     FILE *fp;
-    fp = fopen(card, "r");
+    fp = fopen(card_name, "r");
     fscanf(fp, "%s", card_number);
     fclose(fp);
 
@@ -174,6 +181,8 @@ char* get_ui_string(Language lang, UIString key) {
                 return "Администратор ли сте";
             case AMOUNT:
                 return "Наличност по сметка";
+            case CARD_NAME:
+                return "Име на картата";
             case CARD_NUMBER:
                 return "Номер на картата";
             case WITHDRAW:
@@ -193,6 +202,8 @@ char* get_ui_string(Language lang, UIString key) {
                 return "Are you administator";
             case AMOUNT:
                 return "Account amount";
+            case CARD_NAME:
+                return "Card name";
             case CARD_NUMBER:
                 return "Card number";
             case WITHDRAW:
@@ -221,11 +232,13 @@ int initializeTCPConnection(unsigned short port) {
 
     if ((osocket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("Socket creation");
+        closeTCPConnection();
         exit(2);
     }
 
     if (connect(osocket, (struct sockaddr *) &server, sizeof(server)) < 0) {
         perror("Socket connection");
+        closeTCPConnection();
         exit(2);
     }
 
@@ -240,17 +253,18 @@ void closeTCPConnection() {
 void sendClientTCPRequest(Transaction transaction) {
     if (send(osocket_client, &transaction, sizeof(Transaction), 0) < 0) {
         perror("Socket send");
+        closeTCPConnection();
         exit(4);
     }
 
     Response response;
     if (recv(osocket_client, &response, sizeof(Response), 0) < 0) {
         perror("Socket recieve");
+        closeTCPConnection();
         exit(4);
     }
 
-    perror("end");
-    fprintf(stdout, "Code - %u | Message: %s", response.code, response.message);
+    fprintf(stdout, "Code - %u | Message: %s\n", response.code, response.message);
     if (response.code == SUCCESSFULL_WITHDRAW && transaction.cash_receipt) {
         FILE *fp;
         fp = fopen("cash_receipt", "w");
@@ -262,15 +276,16 @@ void sendClientTCPRequest(Transaction transaction) {
 void sendAdminTCPRequest(Client client) {
     if (send(osocket_admin, &client, sizeof(Client), 0) < 0) {
         perror("Socket send");
+        closeTCPConnection();
         exit(4);
     }
 
     Response response;
     if (recv(osocket_admin, &response, sizeof(Response), 0) < 0) {
         perror("Socket recieve");
+        closeTCPConnection();
         exit(4);
     }
 
-    perror("end");
-    fprintf(stdout, "Code - %u | Message: %s", response.code, response.message);
+    fprintf(stdout, "Code - %u | Message: %s\n", response.code, response.message);
 }

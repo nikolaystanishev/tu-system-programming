@@ -20,13 +20,13 @@ void storeDB();
 int initializeTCPConnection(unsigned short);
 void closeTCPConnection();
 void handleTCPConnection();
-void handleClientTCPConnection();
-void handleAdminTCPConnection();
+void *handleClientTCPConnection(void *);
+void *handleAdminTCPConnection(void *);
 
 void addClientToDB(Client);
-Client findClient(Transaction);
-Client findClientByCard(char*);
-bool isClientNull(Client);
+int findClient(Transaction);
+int findClientByCard(char*);
+bool isClientNull(int);
 
 
 Client *db;
@@ -49,7 +49,6 @@ int main() {
 
     closeTCPConnection();
 
-    storeDB();
     return 0;
 }
 
@@ -79,7 +78,8 @@ void loadDB() {
     db_count = 0;
     db = (Client *) calloc(1, sizeof(Client));
     if (db == NULL) {
-        printf("Cannot create database");
+        perror("Cannot create database");
+        closeTCPConnection();
         exit(1);
     }
 
@@ -98,6 +98,8 @@ void loadDB() {
     }
 
     fclose(fp);
+
+    fprintf(stdout, "DB loaded\n");
 }
 
 void storeDB() {
@@ -106,6 +108,8 @@ void storeDB() {
 
     fwrite(db, sizeof(Client), db_count, fp);
     fclose(fp);
+
+    fprintf(stdout, "DB store\n");
 }
 
 int initializeTCPConnection(unsigned short port) {
@@ -116,6 +120,7 @@ int initializeTCPConnection(unsigned short port) {
 
     if ((osocket[port % 2] = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("Socket creation");
+        closeTCPConnection();
         exit(2);
     }
 
@@ -125,22 +130,26 @@ int initializeTCPConnection(unsigned short port) {
 
     if (bind(osocket[port % 2], (struct sockaddr *)&server, sizeof(server)) < 0) {
         perror("Socket binding");
+        closeTCPConnection();
         exit(2);
     }
 
     if (listen(osocket[port % 2], 1) != 0) {
         perror("Socket listening");
+        closeTCPConnection();
         exit(2);
     }
 
     namelen = sizeof(client);
     if ((nsocket = accept(osocket[port % 2], (struct sockaddr *)&client, &namelen)) == -1) {
         perror("Socket accept");
+        closeTCPConnection();
         exit(2);
     }
 
     if (pthread_mutex_init(&client_lock, NULL) != 0) {
         perror("Mutex initialization");
+        closeTCPConnection();
         exit(3);
     }
 
@@ -154,78 +163,102 @@ void closeTCPConnection() {
     close(osocket[1]);
 
     pthread_mutex_destroy(&client_lock);
+
+    storeDB();
 }
 
 void handleTCPConnection() {
-    while (1) {
-        handleClientTCPConnection();
-        handleAdminTCPConnection();
+    fprintf(stdout, "Server ready\n");
+
+    pthread_t threads[2];
+
+    if (pthread_create(&threads[CLIENT_PORT % 2], NULL, handleClientTCPConnection, NULL)) {
+        perror("Thread creation");
+        closeTCPConnection();
+        exit(3);
     }
+    if (pthread_create(&threads[ADMIN_PORT % 2], NULL, handleAdminTCPConnection, NULL)) {
+        perror("Thread creation");
+        closeTCPConnection();
+        exit(3);
+    }
+
+    pthread_join(threads[0], NULL);
+    pthread_join(threads[1], NULL);
 }
 
-void handleClientTCPConnection() {
-    Transaction transaction;
-
+void *handleClientTCPConnection(void *thread_id) {
     while (1) {
+        Transaction transaction;
+
         if (recv(nsocket_client, &transaction, sizeof(Transaction), 0) == -1) {
             perror("Socket recieve");
+            closeTCPConnection();
             exit(4);
         }
 
-        Client client = findClient(transaction);
+        int client = findClient(transaction);
         if (isClientNull(client)) {
-            Response response = {MISSING_USER, ""};
+            Response response = {MISSING_USER, "Missing user"};
             if (send(nsocket_client, &response, sizeof(Response), 0) < 0) {
                 perror("Socket send");
+                closeTCPConnection();
                 exit(4);
             }
             continue;
         }
 
-        while (client.lock == true) { }
+        while (db[client].lock == true) { }
         pthread_mutex_lock(&client_lock);
-        client.lock = true;
+        db[client].lock = true;
         pthread_mutex_unlock(&client_lock);
 
-        if (client.amount < transaction.withdraw_amount) {
-            Response response = {NOT_ENOUGH_MONEY, ""};
+        if (db[client].amount < transaction.withdraw_amount) {
+            Response response = {NOT_ENOUGH_MONEY, "Not enough money"};
             if (send(nsocket_client, &response, sizeof(Response), 0) < 0) {
                 perror("Socket send");
+                closeTCPConnection();
                 exit(4);
             }
             continue;
         }
 
-        client.amount -= transaction.withdraw_amount;
+        db[client].amount -= transaction.withdraw_amount;
 
-        client.lock = false;
+        db[client].lock = false;
 
         char cash_receipt[1000];
-        snprintf(cash_receipt, 1000, "Money in account - %d | Withdrawen money - %d", client.amount, transaction.withdraw_amount);
+        snprintf(
+            cash_receipt, 1000,
+            "Money in account - %d | Withdrawen money - %d", db[client].amount, transaction.withdraw_amount
+        );
 
         Response response = {SUCCESSFULL_WITHDRAW, ""};
         strcpy(response.message, cash_receipt);
         if (send(nsocket_client, &response, sizeof(Response), 0) < 0) {
             perror("Socket send");
+            closeTCPConnection();
             exit(4);
         }
     }
 }
 
-void handleAdminTCPConnection() {
-    Client client;
-
+void *handleAdminTCPConnection(void *thread_id) {
     while (1) {
+        Client client;
+
         if (recv(nsocket_admin, &client, sizeof(Client), 0) == -1) {
             perror("Socket recieve");
+            closeTCPConnection();
             exit(4);
         }
 
-        Client client = findClientByCard(client.card_number);
-        if (!isClientNull(client)) {
-            Response response = {CLIENT_ALREADY_EXISTS, ""};
+        int db_client = findClientByCard(client.card_number);
+        if (!isClientNull(db_client)) {
+            Response response = {CLIENT_ALREADY_EXISTS, "Client alredy exists"};
             if (send(nsocket_admin, &response, sizeof(Response), 0) < 0) {
                 perror("Socket send");
+                closeTCPConnection();
                 exit(4);
             }
             continue;
@@ -235,9 +268,10 @@ void handleAdminTCPConnection() {
         addClientToDB(client);
         pthread_mutex_unlock(&client_lock);
 
-        Response response = {SUCCESSFULL_CLIENT_CREATION, ""};
+        Response response = {SUCCESSFULL_CLIENT_CREATION, "Successfull client creation"};
         if (send(nsocket_admin, &response, sizeof(Response), 0) < 0) {
             perror("Socket send");
+            closeTCPConnection();
             exit(4);
         }
     }
@@ -248,6 +282,7 @@ void addClientToDB(Client client) {
 
     if (temp == NULL) {
         perror("Cannot add client to database.");
+        closeTCPConnection();
         exit(1);
     } else {
         db = temp;
@@ -256,30 +291,26 @@ void addClientToDB(Client client) {
     db[db_count - 1] = client;
 }
 
-Client findClient(Transaction transaction) {
-    Client client = findClientByCard(transaction.card_number);
+int findClient(Transaction transaction) {
+    int client = findClientByCard(transaction.card_number);
     
-    if (!strcmp(client.pin, transaction.pin)) {
+    if (!strcmp(db[client].pin, transaction.pin)) {
         return client;
     }
 
-    return (Client) {0, "", "", false};
+    return -1;
 }
 
-Client findClientByCard(char* card_number) {
+int findClientByCard(char* card_number) {
     for (int i = 0; i < db_count; i++) {
         if (!strcmp(db[i].card_number, card_number)) {
-            return db[i];
+            return i;
         }
     }
 
-    return (Client) {0, "", "", false};
+    return -1;
 }
 
-bool isClientNull(Client client) {
-    if (client.amount == 0 && !strcmp(client.card_number, "") && !strcmp(client.pin, "") && client.lock == false) {
-        return true;
-    }
-
-    return false;
+bool isClientNull(int client) {
+    return client == -1 ? true : false;
 }
