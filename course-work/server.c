@@ -23,12 +23,14 @@ void handleTCPConnection();
 void handleClientTCPConnection();
 void handleAdminTCPConnection();
 
+void addClientToDB(Client);
 Client findClient(Transaction);
 Client findClientByCard(char*);
 bool isClientNull(Client);
 
 
-Client db[10];
+Client *db;
+int db_count = 0;
 
 int osocket[2];
 int nsocket_client;
@@ -74,15 +76,25 @@ void fillDB() {
 }
 
 void loadDB() {
+    db_count = 0;
+    db = (Client *) calloc(1, sizeof(Client));
+    if (db == NULL) {
+        printf("Cannot create database");
+        exit(1);
+    }
+
     FILE *fp;
     fp = fopen("db", "rb");
     int indx = 0;
 
     while (1) {
-        fread(&db[indx++], sizeof(Client), 1, fp);
+        Client client;
+        fread(&client, sizeof(Client), 1, fp);
         if(feof(fp)) {
             break;
         }
+
+        addClientToDB(client);
     }
 
     fclose(fp);
@@ -92,7 +104,7 @@ void storeDB() {
     FILE *fp;
     fp = fopen("db", "wb");
 
-    fwrite(db, sizeof(db), 1, fp);
+    fwrite(db, sizeof(Client), db_count, fp);
     fclose(fp);
 }
 
@@ -212,7 +224,7 @@ void handleAdminTCPConnection() {
         }
 
         pthread_mutex_lock(&client_lock);
-        // TODO: Add client to DB
+        addClientToDB(client);
         pthread_mutex_unlock(&client_lock);
 
         if (send(nsocket_admin, "Succesful client creation", 26, 0) < 0) {
@@ -220,6 +232,19 @@ void handleAdminTCPConnection() {
             exit(7);
         }
     }
+}
+
+void addClientToDB(Client client) {
+    Client *temp = (Client*) realloc(db, (db_count++ * sizeof(Client)));
+
+    if (temp == NULL) {
+        perror("Cannot add client to database.");
+        exit(1);
+    } else {
+        db = temp;
+    }
+
+    db[db_count - 1] = client;
 }
 
 Client findClient(Transaction transaction) {
