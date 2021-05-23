@@ -20,4 +20,17 @@ typedef struct Client {
 unsigned short CLIENT_PORT = 33333;
 unsigned short ADMIN_PORT = 44444;
 
+typedef enum ResponseCode {
+    MISSING_USER,
+    NOT_ENOUGH_MONEY,
+    SUCCESSFULL_WITHDRAW,
+    CLIENT_ALREADY_EXISTS,
+    SUCCESSFULL_CLIENT_CREATION
+} ResponseCode;
+
+typedef struct Response {
+    ResponseCode code;
+    char message[50];
+} Response;
+
 #endif

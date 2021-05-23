@@ -106,7 +106,6 @@ void client_ui(Language lang) {
     bool cash_receipt = choose_yes_no(lang, CASH_RECEIPT);
     trans.cash_receipt = cash_receipt;
 
-    // TODO: make tcp request to the server and show returned result success /200/ or error make return type enum
     // TODO: add multi client support
     sendClientTCPRequest(trans);
 }
@@ -224,12 +223,12 @@ int initializeTCPConnection(unsigned short port) {
 
     if ((osocket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("Socket creation");
-        exit(3);
+        exit(2);
     }
 
-    if (connect(osocket, (struct sockaddr *)&server, sizeof(server)) < 0) {
+    if (connect(osocket, (struct sockaddr *) &server, sizeof(server)) < 0) {
         perror("Socket connection");
-        exit(4);
+        exit(2);
     }
 
     return osocket;
@@ -243,31 +242,31 @@ void closeTCPConnection() {
 void sendClientTCPRequest(Transaction transaction) {
     if (send(osocket_client, &transaction, sizeof(Transaction), 0) < 0) {
         perror("Socket send");
-        exit(5);
+        exit(4);
     }
 
-    char message[30];
-    if (recv(osocket_client, message, sizeof(message), 0) < 0) {
+    Response response;
+    if (recv(osocket_client, &response, sizeof(Response), 0) < 0) {
         perror("Socket recieve");
-        exit(6);
+        exit(4);
     }
 
     perror("end");
-    fprintf(stdout, "%s", message);
+    fprintf(stdout, "Code - %u | Message: %s", response.code, response.message);
 }
 
 void sendAdminTCPRequest(Client client) {
     if (send(osocket_admin, &client, sizeof(Client), 0) < 0) {
         perror("Socket send");
-        exit(5);
+        exit(4);
     }
 
-    char message[30];
-    if (recv(osocket_admin, message, sizeof(message), 0) < 0) {
+    Response response;
+    if (recv(osocket_admin, &response, sizeof(Response), 0) < 0) {
         perror("Socket recieve");
-        exit(6);
+        exit(4);
     }
 
     perror("end");
-    fprintf(stdout, "%s", message);
+    fprintf(stdout, "Code - %u | Message: %s", response.code, response.message);
 }

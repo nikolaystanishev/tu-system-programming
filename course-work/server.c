@@ -125,23 +125,23 @@ int initializeTCPConnection(unsigned short port) {
 
     if (bind(osocket[port % 2], (struct sockaddr *)&server, sizeof(server)) < 0) {
         perror("Socket binding");
-        exit(3);
+        exit(2);
     }
 
     if (listen(osocket[port % 2], 1) != 0) {
         perror("Socket listening");
-        exit(4);
+        exit(2);
     }
 
     namelen = sizeof(client);
     if ((nsocket = accept(osocket[port % 2], (struct sockaddr *)&client, &namelen)) == -1) {
         perror("Socket accept");
-        exit(5);
+        exit(2);
     }
 
     if (pthread_mutex_init(&client_lock, NULL) != 0) {
         perror("Mutex initialization");
-        exit(6);
+        exit(3);
     }
 
     return nsocket;
@@ -169,14 +169,15 @@ void handleClientTCPConnection() {
     while (1) {
         if (recv(nsocket_client, &transaction, sizeof(Transaction), 0) == -1) {
             perror("Socket recieve");
-            exit(6);
+            exit(4);
         }
 
         Client client = findClient(transaction);
         if (isClientNull(client)) {
-            if (send(nsocket_client, "Missing user", 13, 0) < 0) {
+            Response response = {MISSING_USER, ""};
+            if (send(nsocket_client, &response, sizeof(Response), 0) < 0) {
                 perror("Socket send");
-                exit(7);
+                exit(4);
             }
             continue;
         }
@@ -187,9 +188,10 @@ void handleClientTCPConnection() {
         pthread_mutex_unlock(&client_lock);
 
         if (client.amount < transaction.withdraw_amount) {
-            if (send(nsocket_client, "Not enought money", 18, 0) < 0) {
+            Response response = {NOT_ENOUGH_MONEY, ""};
+            if (send(nsocket_client, &response, sizeof(Response), 0) < 0) {
                 perror("Socket send");
-                exit(7);
+                exit(4);
             }
             continue;
         }
@@ -198,9 +200,10 @@ void handleClientTCPConnection() {
 
         client.lock = false;
 
-        if (send(nsocket_client, "Succesful withdraw", 19, 0) < 0) {
+            Response response = {SUCCESSFULL_WITHDRAW, ""};
+        if (send(nsocket_client, &response, sizeof(Response), 0) < 0) {
             perror("Socket send");
-            exit(7);
+            exit(4);
         }
     }
 }
@@ -211,14 +214,15 @@ void handleAdminTCPConnection() {
     while (1) {
         if (recv(nsocket_admin, &client, sizeof(Client), 0) == -1) {
             perror("Socket recieve");
-            exit(6);
+            exit(4);
         }
 
         Client client = findClientByCard(client.card_number);
         if (!isClientNull(client)) {
-            if (send(nsocket_admin, "Client already exists", 22, 0) < 0) {
+            Response response = {CLIENT_ALREADY_EXISTS, ""};
+            if (send(nsocket_admin, &response, sizeof(Response), 0) < 0) {
                 perror("Socket send");
-                exit(7);
+                exit(4);
             }
             continue;
         }
@@ -227,9 +231,10 @@ void handleAdminTCPConnection() {
         addClientToDB(client);
         pthread_mutex_unlock(&client_lock);
 
-        if (send(nsocket_admin, "Succesful client creation", 26, 0) < 0) {
+        Response response = {SUCCESSFULL_CLIENT_CREATION, ""};
+        if (send(nsocket_admin, &response, sizeof(Response), 0) < 0) {
             perror("Socket send");
-            exit(7);
+            exit(4);
         }
     }
 }
@@ -258,7 +263,7 @@ Client findClient(Transaction transaction) {
 }
 
 Client findClientByCard(char* card_number) {
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < db_count; i++) {
         if (!strcmp(db[i].card_number, card_number)) {
             return db[i];
         }
