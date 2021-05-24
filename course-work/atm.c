@@ -235,8 +235,7 @@ int initializeTCPConnection(unsigned short port) {
 
     if (connect(osocket, (struct sockaddr *) &server, sizeof(server)) < 0) {
         perror("Socket connection");
-        closeTCPConnection();
-        exit(2);
+        return initializeTCPConnection(port);
     }
 
     return osocket;
