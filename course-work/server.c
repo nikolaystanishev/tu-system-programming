@@ -57,16 +57,16 @@ void fillDB() {
     FILE *fp;
 
     Client db[] = {
-        {100, "1234", "1111111111111111", false},
-        {200, "1111", "2222222222222222", false},
-        {300, "2222", "3333333333333333", false},
-        {400, "3333", "4444444444444444", false},
-        {500, "4444", "5555555555555555", false},
-        {600, "5555", "6666666666666666", false},
-        {700, "6666", "7777777777777777", false},
-        {800, "7777", "8888888888888888", false},
-        {900, "8888", "9999999999999999", false},
-        {1000, "9999", "0000000000000000", false},
+        {100, "1234", "1111111111111111"},
+        {200, "1111", "2222222222222222"},
+        {300, "2222", "3333333333333333"},
+        {400, "3333", "4444444444444444"},
+        {500, "4444", "5555555555555555"},
+        {600, "5555", "6666666666666666"},
+        {700, "6666", "7777777777777777"},
+        {800, "7777", "8888888888888888"},
+        {900, "8888", "9999999999999999"},
+        {1000, "9999", "0000000000000000"},
     };
 
     fp = fopen("db", "wb");
@@ -208,11 +208,7 @@ void *handleClientTCPConnection(void *thread_id) {
             continue;
         }
 
-        while (db[client].lock == true) { }
         pthread_mutex_lock(&client_lock);
-        db[client].lock = true;
-        pthread_mutex_unlock(&client_lock);
-
         if (db[client].amount < transaction.withdraw_amount) {
             Response response = {NOT_ENOUGH_MONEY, "Not enough money"};
             if (send(nsocket_client, &response, sizeof(Response), 0) < 0) {
@@ -220,12 +216,12 @@ void *handleClientTCPConnection(void *thread_id) {
                 closeTCPConnection();
                 exit(4);
             }
+            pthread_mutex_unlock(&client_lock);
             continue;
         }
 
         db[client].amount -= transaction.withdraw_amount;
-
-        db[client].lock = false;
+        pthread_mutex_unlock(&client_lock);
 
         char cash_receipt[1000];
         snprintf(

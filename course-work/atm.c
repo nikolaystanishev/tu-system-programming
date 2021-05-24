@@ -105,7 +105,6 @@ void client_ui(Language lang) {
     bool cash_receipt = choose_yes_no(lang, CASH_RECEIPT);
     trans.cash_receipt = cash_receipt;
 
-    // TODO: test what happens with multiple clients if it is missing add multi client support
     sendClientTCPRequest(trans);
 }
 
@@ -128,8 +127,6 @@ void admin_ui(Language lang) {
 
     fprintf(stdout, "%s: ", get_ui_string(lang, AMOUNT));
     scanf("%d", &client.amount);
-
-    client.lock = false;
 
     sendAdminTCPRequest(client);
 }

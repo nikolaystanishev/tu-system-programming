@@ -14,7 +14,6 @@ typedef struct Client {
     int amount;
     char pin[5];
     char card_number[17];
-    bool lock;
 } Client;
 
 unsigned short CLIENT_PORT = 33333;
